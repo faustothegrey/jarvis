@@ -1,0 +1,242 @@
+<style>
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    video {
+        width: auto;
+        max-width: 100%;
+    }
+</style>
+
+<title>Auto Stop RecordRTC on Silence</title>
+<h1>Auto Stop RecordRTC on Silence</h1>
+
+<br>
+<button id="btn-start-recording">Start Recording</button>
+<button id="btn-stop-recording" disabled style="display: none;">Stop Recording</button>
+
+<hr>
+<!-- <video controls autoplay playsinline></video> -->
+<audio controls autoplay playsinline></audio>
+
+<script src="/static/js/RecordRTC.js"></script>
+<script src="https://www.webrtc-experiment.com/hark.js"></script>
+<script>
+    var video = document.querySelector('video');
+    var audio = document.querySelector('audio');
+
+    var h1 = document.querySelector('h1');
+    var default_h1 = h1.innerHTML;
+
+    // function captureCamera(callback) {
+    //     navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(function (camera) {
+    //         callback(camera);
+    //     }).catch(function (error) {
+    //         alert('Unable to capture your camera. Please check console logs.');
+    //         console.error(error);
+    //     });
+    // }
+
+    var microphone;
+    function captureMicrophone(callback) {
+        //btnReleaseMicrophone.disabled = false;
+
+        if (microphone) {
+            callback(microphone);
+            return;
+        }
+
+        if (typeof navigator.mediaDevices === 'undefined' || !navigator.mediaDevices.getUserMedia) {
+            alert('This browser does not supports WebRTC getUserMedia API.');
+
+            if (!!navigator.getUserMedia) {
+                alert('This browser seems supporting deprecated getUserMedia API.');
+            }
+        }
+
+        navigator.mediaDevices.getUserMedia({
+            audio: isEdge ? true : {
+                echoCancellation: false
+            }
+        }).then(function (mic) {
+            callback(mic);
+        }).catch(function (error) {
+            alert('Unable to capture your microphone. Please check console logs.');
+            console.error(error);
+        });
+    }
+
+
+
+    function replaceAudio(src) {
+        var newAudio = document.createElement('audio');
+        newAudio.controls = true;
+        newAudio.autoplay = true;
+
+        if (src) {
+            newAudio.src = src;
+        }
+
+        var parentNode = audio.parentNode;
+        parentNode.innerHTML = '';
+        parentNode.appendChild(newAudio);
+
+        audio = newAudio;
+    }
+
+    // function stopRecordingCallback() {
+    //     video.srcObject = null;
+    //     var blob = recorder.getBlob();
+    //     video.src = URL.createObjectURL(blob);
+
+    //     recorder.camera.stop();
+    //     video.muted = false;
+    // }
+
+    var recorder; // globally accessible
+
+    function sendFileToServer(blob, filename) {
+        var xhr = new XMLHttpRequest();
+        xhr.onload = function (e) {
+            if (this.readyState === 4) {
+                console.log("Server returned: ", e.target.responseText);
+            }
+        };
+        var fd = new FormData();
+        fd.append("audio_data", blob, filename);
+        xhr.open("POST", "/", true);
+        xhr.send(fd);
+    }
+
+    function stopRecordingCallback() {
+        var blob = recorder.getBlob();
+
+        var filename = "audio.wav"
+        //getFileName('mp3')
+        // var file = new File([blob], filename, {
+        //     type: 'audio/mp3'
+        // });
+        sendFileToServer(blob, filename)
+    }
+
+    document.getElementById('btn-start-recording').onclick = function () {
+        this.disabled = true;
+        //captureCamera(function(camera) {
+        captureMicrophone(function (mic) {
+            microphone = mic
+
+            // video.muted = true;
+            // video.srcObject = camera;
+
+            // recorder = RecordRTC(camera, {
+            //     type: 'video'
+            // });
+
+            replaceAudio();
+
+            audio.muted = true;
+            audio.srcObject = microphone;
+
+            var options = {
+                type: 'audio',
+                numberOfAudioChannels: isEdge ? 1 : 2,
+                checkForInactiveTracks: true,
+                bufferSize: 16384
+            };
+
+            if (isSafari || isEdge) {
+                options.recorderType = StereoAudioRecorder;
+            }
+
+            if (navigator.platform && navigator.platform.toString().toLowerCase().indexOf('win') === -1) {
+                options.sampleRate = 48000; // or 44100 or remove this line for default
+            }
+
+            if (isSafari) {
+                options.sampleRate = 44100;
+                options.bufferSize = 4096;
+                options.numberOfAudioChannels = 2;
+            }
+
+            if (recorder) {
+                recorder.destroy();
+                recorder = null;
+            }
+
+            // recorder = RecordRTC(camera, {
+            //     type: 'audio'
+            // });
+
+            recorder = RecordRTC(microphone, options);
+
+            recorder.startRecording();
+
+            var max_seconds = 3;
+            var stopped_speaking_timeout;
+            var speechEvents = hark(microphone, {});
+
+            speechEvents.on('speaking', function () {
+                //LATER !!!
+                //if (recorder.getBlob()) return;
+
+                console.log("Speaking ...")
+
+                // clearTimeout(stopped_speaking_timeout);
+
+                // if(recorder.getState() === 'paused') {
+                //     // recorder.resumeRecording();
+                // }
+
+                // h1.innerHTML = default_h1;
+            });
+
+            speechEvents.on('stopped_speaking', function () {
+
+                //LATER
+                //if (recorder.getBlob()) return;
+                console.log("Stopped speaking ...")
+
+                recorder.stopRecording(stopRecordingCallback)
+
+                // recorder.pauseRecording();
+                // stopped_speaking_timeout = setTimeout(function() {
+                //     document.getElementById('btn-stop-recording').click();
+                //     h1.innerHTML = 'Recording is now stopped.';
+                // }, max_seconds * 1000);
+
+
+                // // just for logging purpose (you ca remove below code)
+                // var seconds = max_seconds;
+                // (function looper() {
+                //     h1.innerHTML = 'Recording is going to be stopped in ' + seconds + ' seconds.';
+                //     seconds--;
+
+                //     if(seconds <= 0) {
+                //         h1.innerHTML = default_h1;
+                //         return;
+                //     }
+
+                //     setTimeout(looper, 1000);
+                // })();
+            });
+
+            // release camera on stopRecording
+            // ??
+            //recorder.camera = camera;
+
+            // ??
+            // document.getElementById('btn-stop-recording').disabled = false;
+        });
+    };
+
+    document.getElementById('btn-stop-recording').onclick = function () {
+        this.disabled = true;
+        recorder.stopRecording(stopRecordingCallback);
+    };
+</script>
+
+<footer style="margin-top: 20px;"><small id="send-message"></small></footer>
+<script src="https://www.webrtc-experiment.com/common.js"></script>
