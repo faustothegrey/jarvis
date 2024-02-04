@@ -2,6 +2,7 @@
 conv.txt
 status.txt
 **/*.webm
+**/*.wav
 
 
 # Byte-compiled / optimized / DLL files

@@ -87,6 +87,25 @@
         audio = newAudio;
     }
 
+    function playAudio() {
+        replaceAudio(URL.createObjectURL(recorder.getBlob()));
+
+        //btnStartRecording.disabled = false;
+
+        setTimeout(function () {
+            if (!audio.paused) return;
+
+            setTimeout(function () {
+                if (!audio.paused) return;
+                audio.play();
+            }, 1000);
+
+            audio.play();
+        }, 300);
+
+        audio.play();
+    }
+
     // function stopRecordingCallback() {
     //     video.srcObject = null;
     //     var blob = recorder.getBlob();
@@ -98,7 +117,7 @@
 
     var recorder; // globally accessible
 
-    function sendFileToServer(blob, filename) {
+    function uploadToServer(blob, filename) {
         var xhr = new XMLHttpRequest();
         xhr.onload = function (e) {
             if (this.readyState === 4) {
@@ -119,7 +138,12 @@
         // var file = new File([blob], filename, {
         //     type: 'audio/mp3'
         // });
-        sendFileToServer(blob, filename)
+
+        //RE-ENABLE THIS
+        // uploadToServer(blob, filename)
+
+        //PLAYING AUDIO INSTEAD
+        playAudio()
     }
 
     document.getElementById('btn-start-recording').onclick = function () {
@@ -176,7 +200,11 @@
 
             var max_seconds = 3;
             var stopped_speaking_timeout;
-            var speechEvents = hark(microphone, {});
+
+
+            var speechEvents = hark(microphone, {
+                interval: 100
+            });
 
             speechEvents.on('speaking', function () {
                 //LATER !!!
@@ -184,7 +212,7 @@
 
                 console.log("Speaking ...")
 
-                // clearTimeout(stopped_speaking_timeout);
+                clearTimeout(stopped_speaking_timeout);
 
                 // if(recorder.getState() === 'paused') {
                 //     // recorder.resumeRecording();
@@ -201,11 +229,14 @@
 
                 recorder.stopRecording(stopRecordingCallback)
 
-                // recorder.pauseRecording();
-                // stopped_speaking_timeout = setTimeout(function() {
-                //     document.getElementById('btn-stop-recording').click();
-                //     h1.innerHTML = 'Recording is now stopped.';
-                // }, max_seconds * 1000);
+                //recorder.pauseRecording();
+                stopped_speaking_timeout = setTimeout(function () {
+                    // document.getElementById('btn-stop-recording').click();
+                    // h1.innerHTML = 'Recording is now stopped.';
+
+                    // recorder.startRecording();
+
+                }, max_seconds * 1000);
 
 
                 // // just for logging purpose (you ca remove below code)
